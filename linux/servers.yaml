@@ -8,7 +8,7 @@
     status_msg_fail: "Krytyczny błąd aktualizacji na hostcie: {{ inventory_hostname }} ({{ ansible_host }})"
 
   tasks:
-    - name: "Procedura aktualizacji i czyszczenia"
+    - name: "Aktualizacja i czyszczenie"
       block:
         - name: "Odświeżenie list pakietów"
           apt:
@@ -40,7 +40,7 @@
           when: reboot_file.stat.exists
 
       rescue:
-        - name: "Xgloszenie bledu na discord"
+        - name: "Zgloszenie bledu na discord"
           community.general.discord:
             webhook_id: "{{ discord_webhook_id }}"
             webhook_token: "{{ discord_webhook_token }}"
