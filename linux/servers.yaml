@@ -12,7 +12,7 @@
       block:
         - name: "Odświeżenie list pakietów"
           apt:
-            update_cache: yes
+            update_cache: ye
             cache_valid_time: 3600
 
         - name: "Instalacja poprawek (safe-upgrade)"
