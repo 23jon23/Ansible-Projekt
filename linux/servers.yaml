@@ -1,26 +1,48 @@
-- name: Aktualizacja systemu
+- name: "Konserwacja systemów Debian"
   hosts: linux
-  become: yes
+  become: true
+  
+  vars:
+    discord_webhook_id: "1460748367331332208"
+    discord_webhook_token: "Ly_lZnGshZhl-y9R-KwmWr4quCdQzXTxk6H3pgZKUBcwyX9YygH7WnT4GkcM6goKRyCZ"
+    status_msg_fail: "Krytyczny błąd aktualizacji na hostcie: {{ inventory_hostname }} ({{ ansible_host }})"
 
   tasks:
-    - name: Aktualizacja pakietów
+    - name: "Procedura aktualizacji i czyszczenia"
       block:
-        - name: Wykonywanie aktualizacji
+        - name: "Odświeżenie list pakietów"
           apt:
             update_cache: yes
+            cache_valid_time: 3600
+
+        - name: "Instalacja poprawek (safe-upgrade)"
+          apt:
             upgrade: safe
-            autoremove: true
-            autoclean: true
-            clean: true
             dpkg_options: 'force-confold,force-confdef'
           environment:
             DEBIAN_FRONTEND: noninteractive
-          register: upgradeapt
-        
+          register: pkg_result
+
+        - name: "Usuwanie zbędnych pakietów"
+          apt:
+            autoremove: yes
+            autoclean: yes
+          when: pkg_result.changed
+
+        - name: "Sprawdzenie potrzeby restartu"
+          stat:
+            path: /var/run/reboot-required
+          register: reboot_file
+
+        - name: "Informacja o konieczności restartu"
+          debug:
+            msg: "System {{ inventory_hostname }} wymaga restartu po aktualizacji kernela!"
+          when: reboot_file.stat.exists
+
       rescue:
-        - name: Wysyłanie powiadomienia na Discord
+        - name: "Xgloszenie bledu na discord"
           community.general.discord:
-            webhook_id: 1460748367331332208
-            webhook_token: Ly_lZnGshZhl-y9R-KwmWr4quCdQzXTxk6H3pgZKUBcwyX9YygH7WnT4GkcM6goKRyCZ
-            username: Semaphore
-            content: " Błąd aktualizacji na: {{ inventory_hostname }} ({{ ansible_host }})"
+            webhook_id: "{{ discord_webhook_id }}"
+            webhook_token: "{{ discord_webhook_token }}"
+            username: "Semaphore - Aktualizacja AGH_Lebda"
+            content: "{{ status_msg_fail }}"
