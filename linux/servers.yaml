@@ -1,0 +1,26 @@
+- name: Aktualizacja systemu
+  hosts: linux
+  become: yes
+
+  tasks:
+    - name: Aktualizacja pakietów
+      block:
+        - name: Wykonywanie aktualizacji
+          apt:
+            update_cache: yes
+            upgrade: safe
+            autoremove: true
+            autoclean: true
+            clean: true
+            dpkg_options: 'force-confold,force-confdef'
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+          register: upgradeapt
+        
+      rescue:
+        - name: Wysyłanie powiadomienia na Discord
+          community.general.discord:
+            webhook_id: 1460748367331332208
+            webhook_token: Ly_lZnGshZhl-y9R-KwmWr4quCdQzXTxk6H3pgZKUBcwyX9YygH7WnT4GkcM6goKRyCZ
+            username: Semaphore
+            content: " Błąd aktualizacji na: {{ inventory_hostname }} ({{ ansible_host }})"
