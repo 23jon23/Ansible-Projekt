@@ -5,7 +5,7 @@
   vars:
     discord_webhook_id: "1460748367331332208"
     discord_webhook_token: "Ly_lZnGshZhl-y9R-KwmWr4quCdQzXTxk6H3pgZKUBcwyX9YygH7WnT4GkcM6goKRyCZ"
-    status_msg_fail: "Krytyczny błąd aktualizacji na hostcie: {{ inventory_hostname }} ({{ ansible_host }})"
+    status_msg_fail: "Błąd aktualizacji na hoscie: {{ inventory_hostname }} ({{ ansible_host }})"
 
   tasks:
     - name: "Aktualizacja i czyszczenie"
