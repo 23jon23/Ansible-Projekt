@@ -105,11 +105,11 @@
         owner: root
         group: root
 
-    # 3. NAPRAWA KONFIGURACJI (KLUCZOWY MOMENT!)
-    - name: "Zmień bind_host na 0.0.0.0 w pliku YAML (żeby działało na nowym IP)"
+    - name: "Zmień bind_host na 0.0.0.0 (naprawa Web Interface)"
       replace:
         path: "{{ restore_location }}/adguardhome/AdGuardHome.yaml"
-        regexp: '^bind_host: .*'
+        # Regex łapie teraz też spacje na początku linii (\s*)
+        regexp: '^\s*bind_host:.*'
         replace: 'bind_host: 0.0.0.0'
 
     # 4. INSTALACJA I START USŁUGI
