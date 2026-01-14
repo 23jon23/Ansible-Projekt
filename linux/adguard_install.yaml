@@ -1,12 +1,10 @@
 ---
-- name: "KKonfiguracja serwera AGH_Lebda pod AdGuard Home"
+- name: "Konfiguracja serwera AGH_Lebda pod AdGuard Home (LVM-RAID1)"
   hosts: linux
   become: true
 
   vars:
-    raid_devices:
-      - /dev/sdb
-      - /dev/sdc
+    raid_devices: "/dev/sdb,/dev/sdc"
     vg_name: "adg_vg"
     lv_name: "adg_lv"
     mount_path: "/adguardhome"
@@ -20,29 +18,23 @@
       - "443/tcp"   
 
   tasks:
-    - name: "Instalacja narzędzi dyskowych (mdadm, lvm2)"
+    - name: "Instalacja narzędzi dyskowych (lvm2)"
       apt:
-        name: [mdadm, lvm2]
+        name: lvm2
         state: present
         update_cache: yes
-
-    - name: "Tworzenie macierzy RAID1 z dwóch dysków 20GB"
-      mdadm:
-        name: /dev/md0
-        devices: "{{ raid_devices }}"
-        level: 1
-        state: present
 
     - name: "Tworzenie Grupy Woluminów (VG) - {{ vg_name }}"
       lvg:
         vg: "{{ vg_name }}"
-        pvs: /dev/md0
+        pvs: "{{ raid_devices }}"
 
-    - name: "Tworzenie Woluminu Logicznego (LV) {{ lv_name }} zajmujacego cale dostepne miejsce"
+    - name: "Tworzenie Woluminu Logicznego (LV) w logice RAID1"
       lvol:
         vg: "{{ vg_name }}"
         lv: "{{ lv_name }}"
         size: 100%FREE
+        opts: "--type raid1"
 
     - name: "Formatowanie woluminu systemem plików EXT4"
       filesystem:
@@ -87,7 +79,7 @@
         proto: "{{ item | split('/') | last }}"
       loop: "{{ allowed_ports }}"
 
-    - name: "Sprawdzemie czy dziala autostart dla UFW "
+    - name: "Sprawdzenie czy dziala autostart dla UFW"
       service:
         name: ufw
         enabled: yes
