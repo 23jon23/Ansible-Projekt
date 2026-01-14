@@ -62,6 +62,9 @@
             content: "{{ status_msg_fail }}"
 
 
+# ==========================================
+# PLAY 2: ODTWARZANIE I URUCHAMIANIE (FULL AUTO)
+# ==========================================
 - name: "Test odtwarzania na nowej maszynie"
   hosts: test_restore
   become: true
@@ -69,26 +72,64 @@
   vars:
     local_dest_dir: "/tmp/backups/agh_lebda"
     backup_filename: "{{ hostvars['localhost']['shared_backup_file'] }}"
-    restore_location: "/opt/odzyskany_agh"  
+    restore_location: "/opt/odzyskany_agh"
 
   tasks:
-    - name: "Weryfikacja czy istnieje plik do odtworzenia"
+    - name: "Weryfikacja czy mamy plik do odtworzenia"
       debug:
-        msg: "Odtwarzany plik: {{ backup_filename }} na maszynie {{ inventory_hostname }}"
+        msg: "Będę odtwarzał plik: {{ backup_filename }} na maszynie {{ inventory_hostname }}"
 
-    - name: "Sprawdzenie, czy katalog docelowy istnieje"
+    # 1. PRZYGOTOWANIE MIEJSCA
+    - name: "Zatrzymaj usługę AdGuardHome jeśli już działa (cleanup)"
+      service:
+        name: AdGuardHome
+        state: stopped
+      ignore_errors: yes  # Ignoruj błąd, jeśli usługa jeszcze nie istnieje
+
+    - name: "Wyczyść katalog docelowy (dla pewności)"
+      file:
+        path: "{{ restore_location }}"
+        state: absent
+
+    - name: "Stwórz katalog docelowy"
       file:
         path: "{{ restore_location }}"
         state: directory
         mode: '0755'
 
-    - name: "Przesylanie i rozpakowanie backupu"
+    # 2. ROZPAKOWANIE
+    - name: "Prześlij i rozpakuj backup"
       unarchive:
         src: "{{ local_dest_dir }}/{{ backup_filename }}"
         dest: "{{ restore_location }}"
         owner: root
         group: root
-        
+
+    # 3. NAPRAWA KONFIGURACJI (KLUCZOWY MOMENT!)
+    - name: "Zmień bind_host na 0.0.0.0 w pliku YAML (żeby działało na nowym IP)"
+      replace:
+        path: "{{ restore_location }}/adguardhome/AdGuardHome.yaml"
+        regexp: '^bind_host: .*'
+        replace: 'bind_host: 0.0.0.0'
+
+    # 4. INSTALACJA I START USŁUGI
+    - name: "Zainstaluj AdGuard Home jako usługę systemową"
+      command:
+        cmd: "./AdGuardHome -s install"
+        chdir: "{{ restore_location }}/adguardhome"
+      register: install_result
+      # Jeśli usługa już istnieje, AGH zwróci błąd, ale to OK - ignorujemy to
+      failed_when: 
+        - install_result.rc != 0
+        - '"already exists" not in install_result.stderr'
+        - '"already exists" not in install_result.stdout'
+
+    - name: "Uruchom usługę AdGuardHome"
+      service:
+        name: AdGuardHome
+        state: restarted
+        enabled: yes
+
     - name: "Raport końcowy"
       debug:
-        msg: "Pliki zostały przywrócone do katalogu: {{ restore_location }}."
+        msg: "Gotowe! AdGuard powinien być dostępny pod adresem: http://{{ ansible_host }}"
