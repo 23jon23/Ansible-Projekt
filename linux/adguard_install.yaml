@@ -53,6 +53,7 @@
         path: "{{ mount_path }}"
         src: "/dev/{{ vg_name }}/{{ lv_name }}"
         fstype: ext4
+        opts: "defaults,exec" 
         state: mounted
 
     - name: "Pobieranie i rozpakowywanie AdGuard Home"
@@ -70,7 +71,7 @@
         group: root
 
     - name: "Instalacja AdGuard Home jako usługi systemowej"
-      shell: "{{ mount_path }}/AdGuardHome -s install" 
+      shell: "./AdGuardHome -s install"
       args:
         chdir: "{{ mount_path }}"
         creates: "/etc/systemd/system/AdGuardHome.service"
