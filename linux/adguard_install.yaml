@@ -48,13 +48,19 @@
         fstype: ext4
         dev: "/dev/{{ vg_name }}/{{ lv_name }}"
 
-    - name: "Tworzenie punktu montowania i montowanie woluminu"
+    - name: "Tworzenie punktu montowania i konfiguracja fstab"
       mount:
         path: "{{ mount_path }}"
         src: "/dev/{{ vg_name }}/{{ lv_name }}"
         fstype: ext4
         opts: "defaults,exec" 
         state: mounted
+
+
+    - name: "Wymuszenie przemontowania z opcją exec (naprawa błędu Permission denied)"
+      command: "mount -o remount,exec {{ mount_path }}"
+      changed_when: false
+
 
     - name: "Pobieranie i rozpakowywanie AdGuard Home"
       unarchive:
@@ -71,7 +77,7 @@
         group: root
 
     - name: "Instalacja AdGuard Home jako usługi systemowej"
-      shell: "./AdGuardHome -s install"
+      shell: "{{ mount_path }}/AdGuardHome -s install" 
       args:
         chdir: "{{ mount_path }}"
         creates: "/etc/systemd/system/AdGuardHome.service"
