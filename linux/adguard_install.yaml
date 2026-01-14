@@ -66,10 +66,12 @@
       file:
         path: "{{ mount_path }}/AdGuardHome"
         mode: '0755'
+        owner: root
+        group: root
 
     - name: "Instalacja AdGuard Home jako usługi systemowej"
-      command:
-        cmd: "./AdGuardHome -s install"
+      shell: "{{ mount_path }}/AdGuardHome -s install" 
+      args:
         chdir: "{{ mount_path }}"
         creates: "/etc/systemd/system/AdGuardHome.service"
 
