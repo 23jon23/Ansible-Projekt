@@ -1,1 +1,94 @@
+---
+- name: "KKonfiguracja serwera AGH_Lebda pod AdGuard Home"
+  hosts: linux
+  become: true
 
+  vars:
+    raid_devices:
+      - /dev/sdb
+      - /dev/sdc
+    vg_name: "adg_vg"
+    lv_name: "adg_lv"
+    mount_path: "/adguardhome"
+    
+    allowed_ports:
+      - "22/tcp"    
+      - "53/udp"     
+      - "53/tcp"  
+      - "80/tcp"    
+      - "3000/tcp"  
+      - "443/tcp"   
+
+  tasks:
+    - name: "Instalacja narzędzi dyskowych (mdadm, lvm2)"
+      apt:
+        name: [mdadm, lvm2]
+        state: present
+        update_cache: yes
+
+    - name: "Tworzenie macierzy RAID1 z dwóch dysków 20GB"
+      mdadm:
+        name: /dev/md0
+        devices: "{{ raid_devices }}"
+        level: 1
+        state: present
+
+    - name: "Tworzenie Grupy Woluminów (VG) - {{ vg_name }}"
+      lvg:
+        vg: "{{ vg_name }}"
+        pvs: /dev/md0
+
+    - name: "Tworzenie Woluminu Logicznego (LV) {{ lv_name }} zajmujacego cale dostepne miejsce"
+      lvol:
+        vg: "{{ vg_name }}"
+        lv: "{{ lv_name }}"
+        size: 100%FREE
+
+    - name: "Formatowanie woluminu systemem plików EXT4"
+      filesystem:
+        fstype: ext4
+        dev: "/dev/{{ vg_name }}/{{ lv_name }}"
+
+    - name: "Tworzenie punktu montowania i montowanie woluminu"
+      mount:
+        path: "{{ mount_path }}"
+        src: "/dev/{{ vg_name }}/{{ lv_name }}"
+        fstype: ext4
+        state: mounted
+
+    - name: "Pobieranie i rozpakowywanie AdGuard Home"
+      unarchive:
+        src: "https://static.adguard.com/adguardhome/release/AdGuardHome_linux_amd64.tar.gz"
+        dest: "{{ mount_path }}"
+        remote_src: yes
+        extra_opts: [--strip-components=1] 
+
+    - name: "Instalacja AdGuard Home jako usługi systemowej"
+      command:
+        cmd: "./AdGuardHome -s install"
+        chdir: "{{ mount_path }}"
+        creates: "/etc/systemd/system/AdGuardHome.service"
+
+    - name: "Instalacja oprogramowania zapory ogniowej (UFW)"
+      apt:
+        name: ufw
+        state: present
+
+    - name: "Konfiguracja polityki UFW: blokada ruchu przychodzącego"
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: "Otwieranie portów dla SSH i AdGuard Home"
+      ufw:
+        rule: allow
+        port: "{{ item | split('/') | first }}"
+        proto: "{{ item | split('/') | last }}"
+      loop: "{{ allowed_ports }}"
+
+    - name: "Sprawdzemie czy dziala autostart dla UFW "
+      service:
+        name: ufw
+        enabled: yes
+        state: started
