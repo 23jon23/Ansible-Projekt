@@ -1,7 +1,7 @@
 ---
 - name: "Kopia zapasowa AdGuard Home"
   hosts: linux
-  become: true
+  become: true 
 
   vars:
     discord_webhook_id: "1460748367331332208"
@@ -9,9 +9,7 @@
     status_msg_fail: "Błąd wykonywania kopii zapasowej AGH na hoscie: {{ inventory_hostname }} ({{ ansible_host }})"
 
     backup_src: "/adguardhome"
-    
     local_dest_dir: "/var/backups/agh_lebda"
-    
     timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}"
     backup_filename: "agh_backup_{{ timestamp }}.tar.gz"
 
@@ -24,6 +22,7 @@
             state: directory
             mode: '0755'
           delegate_to: localhost
+          become: false 
 
         - name: "Pakowanie plików AdGuard Home do archiwum .tar.gz"
           community.general.archive:
@@ -31,6 +30,7 @@
             dest: "/tmp/{{ backup_filename }}"
             format: gz
             force_archive: true
+          # Tu become: true działa automatycznie (z góry playbooka)
 
         - name: "Pobieranie archiwum na serwer Ansible"
           fetch:
