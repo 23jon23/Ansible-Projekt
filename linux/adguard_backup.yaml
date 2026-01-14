@@ -43,7 +43,7 @@
             path: "/tmp/{{ backup_filename }}"
             state: absent
 
-        - name: "Zapisz nazwę pliku dla procedury restore"
+        - name: "Zapis nazwy pliku dla procedury restore"
           set_fact:
             shared_backup_file: "{{ backup_filename }}"
           delegate_to: localhost
@@ -72,17 +72,17 @@
     restore_location: "/opt/odzyskany_agh"  
 
   tasks:
-    - name: "Weryfikacja czy mamy plik do odtworzenia"
+    - name: "Weryfikacja czy istnieje plik do odtworzenia"
       debug:
-        msg: "Będę odtwarzał plik: {{ backup_filename }} na maszynie {{ inventory_hostname }}"
+        msg: "Odtwarzany plik: {{ backup_filename }} na maszynie {{ inventory_hostname }}"
 
-    - name: "Upewnij się, że katalog docelowy istnieje"
+    - name: "Sprawdzenie, czy katalog docelowy istnieje"
       file:
         path: "{{ restore_location }}"
         state: directory
         mode: '0755'
 
-    - name: "Prześlij i rozpakuj backup (UNARCHIVE)"
+    - name: "Przesylanie i rozpakowanie backupu"
       unarchive:
         src: "{{ local_dest_dir }}/{{ backup_filename }}"
         dest: "{{ restore_location }}"
