@@ -53,7 +53,12 @@
         src: "https://static.adguard.com/adguardhome/release/AdGuardHome_linux_amd64.tar.gz"
         dest: "{{ mount_path }}"
         remote_src: yes
-        extra_opts: [--strip-components=1] 
+        extra_opts: [--strip-components=1]
+
+    - name: "Nadanie uprawnień wykonywania dla pliku binarnego"
+      file:
+        path: "{{ mount_path }}/AdGuardHome"
+        mode: '0755'
 
     - name: "Instalacja AdGuard Home jako usługi systemowej"
       command:
