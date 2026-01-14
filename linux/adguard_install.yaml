@@ -29,12 +29,19 @@
         vg: "{{ vg_name }}"
         pvs: "{{ raid_devices }}"
 
+    - name: "Sprawdzenie czy wolumin logiczny już istnieje"
+      shell: "lvs /dev/{{ vg_name }}/{{ lv_name }}"
+      register: lv_exists
+      ignore_errors: yes
+      changed_when: false
+
     - name: "Tworzenie Woluminu Logicznego (LV) w logice RAID1"
       lvol:
         vg: "{{ vg_name }}"
         lv: "{{ lv_name }}"
         size: 100%VG
         opts: "--type raid1"
+      when: lv_exists.rc != 0  
 
     - name: "Formatowanie woluminu systemem plików EXT4"
       filesystem:
