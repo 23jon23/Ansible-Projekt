@@ -1,5 +1,7 @@
 ---
-
+# ==========================================
+# PLAY 1: KOPIA ZAPASOWA (BEZ ZMIAN)
+# ==========================================
 - name: "Kopia zapasowa AdGuard Home - Źródło"
   hosts: agh_lebda 
   become: true 
@@ -63,7 +65,7 @@
 
 
 # ==========================================
-# PLAY 2: ODTWARZANIE I URUCHAMIANIE (FULL AUTO)
+# PLAY 2: ODTWARZANIE I URUCHAMIANIE (POPRAWIONY)
 # ==========================================
 - name: "Test odtwarzania na nowej maszynie"
   hosts: test_restore
@@ -79,12 +81,20 @@
       debug:
         msg: "Będę odtwarzał plik: {{ backup_filename }} na maszynie {{ inventory_hostname }}"
 
-    # 1. PRZYGOTOWANIE MIEJSCA
-    - name: "Zatrzymaj usługę AdGuardHome jeśli już działa (cleanup)"
+    # 1. PRZYGOTOWANIE MIEJSCA I ŚRODOWISKA
+    - name: "Zatrzymaj usługę AdGuardHome jeśli już działa"
       service:
         name: AdGuardHome
         state: stopped
-      ignore_errors: yes  # Ignoruj błąd, jeśli usługa jeszcze nie istnieje
+      ignore_errors: yes
+
+    # [NOWOŚĆ] Zwolnienie portu 53
+    - name: "Zatrzymaj i wyłącz systemd-resolved (konflikt portu 53)"
+      service:
+        name: systemd-resolved
+        state: stopped
+        enabled: no
+      ignore_errors: yes
 
     - name: "Wyczyść katalog docelowy (dla pewności)"
       file:
@@ -104,13 +114,30 @@
         dest: "{{ restore_location }}"
         owner: root
         group: root
+    
+    # [NOWOŚĆ] Nadanie uprawnień (naprawia błąd "found unexpected permissions")
+    - name: "Nadaj uprawnienia wykonywalności dla pliku binarnego"
+      file:
+        path: "{{ restore_location }}/adguardhome/AdGuardHome"
+        mode: '0755'
+        owner: root
+        group: root
 
-    - name: "Zmień bind_host na 0.0.0.0 (naprawa Web Interface)"
+    # 3. NAPRAWA KONFIGURACJI (YAML)
+    # Naprawa sekcji HTTP (Web Interface) - kluczowe dla błędu "bind: cannot assign requested address"
+    - name: "Napraw adres nasłuchiwania HTTP (zmień stare IP na 0.0.0.0)"
       replace:
         path: "{{ restore_location }}/adguardhome/AdGuardHome.yaml"
-        # Regex łapie teraz też spacje na początku linii (\s*)
-        regexp: '^\s*bind_host:.*'
-        replace: 'bind_host: 0.0.0.0'
+        regexp: '^\s*address:\s*\d{1,3}(\.\d{1,3}){3}:80'
+        replace: '  address: 0.0.0.0:80'
+
+    # Naprawa sekcji DNS (Bind Hosts)
+    - name: "Napraw adres nasłuchiwania DNS (zmień stare IP na 0.0.0.0)"
+      replace:
+        path: "{{ restore_location }}/adguardhome/AdGuardHome.yaml"
+        # Szukamy starego IP w liście (zakładamy format listy YAML)
+        regexp: '^\s*-\s*192\.168\.\d+\.\d+'
+        replace: '  - 0.0.0.0'
 
     # 4. INSTALACJA I START USŁUGI
     - name: "Zainstaluj AdGuard Home jako usługę systemową"
@@ -118,7 +145,6 @@
         cmd: "./AdGuardHome -s install"
         chdir: "{{ restore_location }}/adguardhome"
       register: install_result
-      # Jeśli usługa już istnieje, AGH zwróci błąd, ale to OK - ignorujemy to
       failed_when: 
         - install_result.rc != 0
         - '"already exists" not in install_result.stderr'
