@@ -33,7 +33,7 @@
       lvol:
         vg: "{{ vg_name }}"
         lv: "{{ lv_name }}"
-        size: 100%FREE
+        size: 100%VG
         opts: "--type raid1"
 
     - name: "Formatowanie woluminu systemem plików EXT4"
