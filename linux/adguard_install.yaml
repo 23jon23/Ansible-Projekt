@@ -78,20 +78,21 @@
         name: AdGuardHome
         state: stopped
 
-    
+    - name: "Odinstalowanie usługi z lokalizacji tymczasowej"
+      shell: "/opt/AdGuardHome/AdGuardHome -s uninstall"
+      ignore_errors: yes 
+      
     - name: "Czyszczenie katalogu docelowego przed migracją"
       shell: "rm -rf {{ mount_path }}/*"
-     
 
     - name: "Przeniesienie plików z /opt na wolumin RAID"
       shell: "cp -r /opt/AdGuardHome/* {{ mount_path }}/"
-      
 
-    - name: "Rejestracja usługi w nowej lokalizacji"
+    - name: "Rejestracja usługi w nowej lokalizacji (RAID)"
       shell: "./AdGuardHome -s install -w {{ mount_path }}"
       args:
         chdir: "{{ mount_path }}"
-      
+
     - name: "Start AdGuarda z RAIDa"
       service:
         name: AdGuardHome
