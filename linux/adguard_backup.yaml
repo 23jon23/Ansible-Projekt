@@ -1,17 +1,16 @@
 ---
-- name: "Kopia zapasowa AdGuard Home"
-  hosts: linux
+
+- name: "Kopia zapasowa AdGuard Home - Źródło"
+  hosts: agh_lebda 
   become: true 
 
   vars:
     discord_webhook_id: "1460748367331332208"
     discord_webhook_token: "Ly_lZnGshZhl-y9R-KwmWr4quCdQzXTxk6H3pgZKUBcwyX9YygH7WnT4GkcM6goKRyCZ"
-    status_msg_fail: "Błąd wykonywania kopii zapasowej AGH na hoscie: {{ inventory_hostname }} ({{ ansible_host }})"
+    status_msg_fail: "Błąd wykonywania kopii zapasowej AGH na hoscie: {{ inventory_hostname }}"
 
     backup_src: "/adguardhome"
-    
     local_dest_dir: "/tmp/backups/agh_lebda"
-    
     timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}"
     backup_filename: "agh_backup_{{ timestamp }}.tar.gz"
 
@@ -44,9 +43,15 @@
             path: "/tmp/{{ backup_filename }}"
             state: absent
 
-        - name: "Sukces ?"
+        - name: "Zapisz nazwę pliku dla procedury restore"
+          set_fact:
+            shared_backup_file: "{{ backup_filename }}"
+          delegate_to: localhost
+          delegate_facts: true
+
+        - name: "Sukces - Backup pobrany"
           debug:
-            msg: "Kopia zapasowa została pomyślnie zapisana w: {{ local_dest_dir }}/{{ backup_filename }}"
+            msg: "Backup gotowy: {{ local_dest_dir }}/{{ backup_filename }}"
 
       rescue:
         - name: "Zgloszenie bledu na Discord"
@@ -55,3 +60,35 @@
             webhook_token: "{{ discord_webhook_token }}"
             username: "Semaphore - Backup AGH"
             content: "{{ status_msg_fail }}"
+
+
+- name: "Test odtwarzania na nowej maszynie"
+  hosts: test_restore
+  become: true
+
+  vars:
+    local_dest_dir: "/tmp/backups/agh_lebda"
+    backup_filename: "{{ hostvars['localhost']['shared_backup_file'] }}"
+    restore_location: "/opt/odzyskany_agh"  
+
+  tasks:
+    - name: "Weryfikacja czy mamy plik do odtworzenia"
+      debug:
+        msg: "Będę odtwarzał plik: {{ backup_filename }} na maszynie {{ inventory_hostname }}"
+
+    - name: "Upewnij się, że katalog docelowy istnieje"
+      file:
+        path: "{{ restore_location }}"
+        state: directory
+        mode: '0755'
+
+    - name: "Prześlij i rozpakuj backup (UNARCHIVE)"
+      unarchive:
+        src: "{{ local_dest_dir }}/{{ backup_filename }}"
+        dest: "{{ restore_location }}"
+        owner: root
+        group: root
+        
+    - name: "Raport końcowy"
+      debug:
+        msg: "Pliki zostały przywrócone do katalogu: {{ restore_location }}."
