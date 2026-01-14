@@ -1,0 +1,57 @@
+---
+- name: "Kopia zapasowa AdGuard Home"
+  hosts: linux
+  become: true
+
+  vars:
+    discord_webhook_id: "1460748367331332208"
+    discord_webhook_token: "Ly_lZnGshZhl-y9R-KwmWr4quCdQzXTxk6H3pgZKUBcwyX9YygH7WnT4GkcM6goKRyCZ"
+    status_msg_fail: "Błąd wykonywania kopii zapasowej AGH na hoscie: {{ inventory_hostname }} ({{ ansible_host }})"
+
+    backup_src: "/adguardhome"
+    
+    local_dest_dir: "/var/backups/agh_lebda"
+    
+    timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}"
+    backup_filename: "agh_backup_{{ timestamp }}.tar.gz"
+
+  tasks:
+    - name: "Tworzenie i pobieranie kopii zapasowej"
+      block:
+        - name: "Sprawdzanie czy na serwerze sterującym istnieje katalog na backup"
+          file:
+            path: "{{ local_dest_dir }}"
+            state: directory
+            mode: '0755'
+          delegate_to: localhost
+          become: true 
+
+        - name: "Pakowanie plików AdGuard Home do archiwum .tar.gz"
+          community.general.archive:
+            path: "{{ backup_src }}"
+            dest: "/tmp/{{ backup_filename }}"
+            format: gz
+            force_archive: true
+
+        - name: "Pobieranie archiwum na serwer Ansible"
+          fetch:
+            src: "/tmp/{{ backup_filename }}"
+            dest: "{{ local_dest_dir }}/{{ backup_filename }}"
+            flat: yes
+
+        - name: "Usuwanie tymczasowego archiwum z serwera zdalnego"
+          file:
+            path: "/tmp/{{ backup_filename }}"
+            state: absent
+
+        - name: "Sukces ?"
+          debug:
+            msg: "Kopia zapasowa została pomyślnie zapisana w: {{ local_dest_dir }}/{{ backup_filename }}"
+
+      rescue:
+        - name: "Zgloszenie bledu na Discord"
+          community.general.discord:
+            webhook_id: "{{ discord_webhook_id }}"
+            webhook_token: "{{ discord_webhook_token }}"
+            username: "Semaphore - Backup AGH"
+            content: "{{ status_msg_fail }}"
