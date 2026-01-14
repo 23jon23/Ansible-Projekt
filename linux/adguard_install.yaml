@@ -48,7 +48,7 @@
         fstype: ext4
         dev: "/dev/{{ vg_name }}/{{ lv_name }}"
 
-    - name: "Odmontowanie dysku (dla pewności)"
+    - name: "Odmontowanie dysku"
       mount:
         path: "{{ mount_path }}"
         state: unmounted
@@ -61,7 +61,7 @@
         opts: "defaults" 
         state: mounted
 
-    - name: "Pobieranie oficjalnego skryptu instalacyjnego do /tmp"
+    - name: "Pobieranie skryptu instalacyjnego do /tmp"
       get_url:
         url: https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh
         dest: /tmp/install_agh.sh
@@ -72,20 +72,27 @@
       args:
         creates: /opt/AdGuardHome/AdGuardHome
 
+    
     - name: "Zatrzymanie AdGuarda przed migracją"
       service:
         name: AdGuardHome
         state: stopped
 
+    
+    - name: "Czyszczenie katalogu docelowego przed migracją"
+      shell: "rm -rf {{ mount_path }}/*"
+     
+
     - name: "Przeniesienie plików z /opt na wolumin RAID"
       shell: "cp -r /opt/AdGuardHome/* {{ mount_path }}/"
+      
 
     - name: "Rejestracja usługi w nowej lokalizacji"
       shell: "./AdGuardHome -s install -w {{ mount_path }}"
       args:
         chdir: "{{ mount_path }}"
-
-    - name: "Start AdGuarda z RAID"
+      
+    - name: "Start AdGuarda z RAIDa"
       service:
         name: AdGuardHome
         state: started
