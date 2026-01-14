@@ -1,7 +1,7 @@
 ---
 - name: "Kopia zapasowa AdGuard Home"
   hosts: linux
-  become: true # To działa dla zadań na zdalnym serwerze (agh_lebda)
+  become: true 
 
   vars:
     discord_webhook_id: "1460748367331332208"
@@ -10,7 +10,6 @@
 
     backup_src: "/adguardhome"
     
-    # --- ZMIANA TUTAJ: Zapisujemy do /tmp, bo tam mamy prawa zapisu bez sudo ---
     local_dest_dir: "/tmp/backups/agh_lebda"
     
     timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}"
@@ -25,7 +24,7 @@
             state: directory
             mode: '0755'
           delegate_to: localhost
-          become: false # Wykonujemy jako zwykły użytkownik Semaphore
+          become: false 
 
         - name: "Pakowanie plików AdGuard Home do archiwum .tar.gz"
           community.general.archive:
