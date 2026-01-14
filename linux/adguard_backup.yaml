@@ -93,7 +93,7 @@
         path: "{{ restore_location }}"
         state: absent
 
-    - name: "Stworzenie katalog docelowy"
+    - name: "Stworzenie katalogu docelowego"
       file:
         path: "{{ restore_location }}"
         state: directory
