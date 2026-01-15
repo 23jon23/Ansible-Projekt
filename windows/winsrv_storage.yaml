@@ -92,7 +92,19 @@
         state: present
 
     - name: Instalacja aplikacji Winget
+      become: true
+      become_user: "{{ ansible_user }}" 
       win_shell: |
+        # 1. Dodaj ścieżkę do aplikacji sklepowych do PATH (Ansible czasem jej nie widzi)
+        $env:Path += ";$env:LOCALAPPDATA\Microsoft\WindowsApps"
+        
+        # 2. Sprawdź czy winget w ogóle istnieje
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Write-Warning "Winget nie jest wykrywany. Próba instalacji aplikacji przez alternatywną metodę nie jest zaimplementowana."
+            throw "Winget nie jest zainstalowany na tym serwerze. Windows Server wymaga ręcznej instalacji 'App Installer' z GitHub."
+        }
+
+        # 3. Instalacja
         winget install --id "{{ item.id }}" --source winget --accept-package-agreements --accept-source-agreements --exact --scope machine
       loop:
         - { id: "7zip.7zip" }
@@ -102,6 +114,7 @@
       failed_when: 
         - winget_result.rc != 0 
         - '"No available upgrade found" not in winget_result.stdout'
+        - '"installed" not in winget_result.stdout'
 
     - name: Dodawanie blokady usuwania drukarek w Rejestrze
       win_shell: |
