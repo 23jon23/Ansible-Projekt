@@ -1,1 +1,114 @@
+---
+- name: Konfiguracja Windows Server
+  hosts: winsrv_lebda
+  gather_facts: yes
+  become: true
+  become_method: runas
+  become_user: System
 
+  vars:
+    admin_sid: "S-1-5-32-544"
+
+  tasks:
+    - name: Sprawdzenie czy dysk F istnieje
+      win_stat:
+        path: "F:\\"
+      register: disk_f_check
+
+    - name: Konfiguracja Storage Pool
+      win_shell: |
+        $phyDisks = Get-PhysicalDisk -CanPool $true
+        if ($phyDisks.Count -ge 1) {
+            $poolName = "StoragePool_Lebda"
+            New-StoragePool -FriendlyName $poolName -StorageSubsystemFriendlyName "Windows Storage*" -PhysicalDisks $phyDisks -ErrorAction Stop
+            $vDisk = New-VirtualDisk -StoragePoolFriendlyName $poolName -FriendlyName "VDisk_Lebda" -ResiliencySettingName Mirror -UseMaximumSize
+            $disk = $vDisk | Get-Disk
+            $disk | Initialize-Disk -PartitionStyle GPT -ErrorAction Stop
+            $disk | New-Partition -DriveLetter "F" -UseMaximumSize -ErrorAction Stop
+            Format-Volume -DriveLetter "F" -FileSystem ReFS -NewFileSystemLabel "DataPool_Lebda" -Confirm:$false -Force
+        }
+      when: not disk_f_check.stat.exists
+
+    - name: Tworzenie uzytkownikow
+      ansible.windows.win_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        state: present
+        groups: []
+        password_never_expires: yes
+      loop:
+        - { name: "Marek Romanek", password: "Zaq12wsx" }
+        - { name: "Jacek Gula", password: "Zaq12wsx" }
+
+    - name: Tworzenie grupy Kierownicy_Lebda
+      ansible.windows.win_group:
+        name: "Kierownicy_Lebda"
+        state: present
+
+    - name: Dodanie uzytkownikow do grupy Kierownicy_Lebda
+      ansible.windows.win_group_membership:
+        name: "Kierownicy_Lebda"
+        members:
+          - "Marek Romanek"
+          - "Jacek Gula"
+        state: present
+
+    - name: Tworzenie katalogu Projekty
+      ansible.windows.win_file:
+        path: "F:\\Projekty"
+        state: directory
+
+    - name: Nadawanie uprawnien NTFS
+      ansible.windows.win_acl:
+        path: "F:\\Projekty"
+        user: "{{ item }}"
+        rights: FullControl
+        type: allow
+        state: present
+        inheritance_flags: ContainerInherit,ObjectInherit
+        propagation_flags: None
+      loop:
+        - "{{ admin_sid }}"
+        - "Kierownicy_Lebda"
+
+    - name: Usuwanie dziedziczenia i grupy Users
+      win_shell: |
+        $acl = Get-Acl "F:\Projekty"
+        $acl.SetAccessRuleProtection($true, $false) 
+        $usersSid = New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-545")
+        $rules = $acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
+        foreach ($rule in $rules) {
+            if ($rule.IdentityReference -eq $usersSid) {
+                $acl.RemoveAccessRule($rule)
+            }
+        }
+        Set-Acl "F:\Projekty" $acl
+
+    - name: Udostepnianie katalogu Projekty_Lebda
+      ansible.windows.win_share:
+        name: "Projekty_Lebda"
+        path: "F:\\Projekty"
+        list: yes
+        full: 
+          - "{{ admin_sid }}"
+          - "Kierownicy_Lebda"
+        read: []
+        state: present
+
+    - name: Instalacja aplikacji Winget
+      win_shell: |
+        winget install --id "{{ item.id }}" --source winget --accept-package-agreements --accept-source-agreements --exact --scope machine
+      loop:
+        - { id: "7zip.7zip" }
+        - { id: "Mozilla.Firefox" }
+        - { id: "ISC.BIND" }
+      register: winget_result
+      failed_when: 
+        - winget_result.rc != 0 
+        - '"No available upgrade found" not in winget_result.stdout'
+
+    - name: Dodawanie blokady usuwania drukarek w Rejestrze
+      win_shell: |
+        $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+        if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+        New-ItemProperty -Path $regPath -Name "NoDeletePrinter" -Value 1 -PropertyType DWORD -Force
