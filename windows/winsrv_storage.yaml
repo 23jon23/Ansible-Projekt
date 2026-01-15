@@ -96,28 +96,29 @@
       become_user: "{{ ansible_user }}"
       win_shell: |
         $env:Path += ";$env:LOCALAPPDATA\Microsoft\WindowsApps"
-        
         winget source reset --force
         winget source update
-      ignore_errors: yes 
+      ignore_errors: yes
 
     - name: Instalacja aplikacji Winget
       become: true
       become_user: "{{ ansible_user }}"
       win_shell: |
         $env:Path += ";$env:LOCALAPPDATA\Microsoft\WindowsApps"
-      
+        
         winget install --id "{{ item.id }}" --source winget --accept-package-agreements --accept-source-agreements --exact --scope machine
       loop:
         - { id: "7zip.7zip" }
         - { id: "Mozilla.Firefox" }
-        - { id: "ISC.BIND" }
+        - { id: "ISC.Bind" }  
       register: winget_install
+
       failed_when: 
         - winget_install.rc != 0 
         - '"No available upgrade found" not in winget_install.stdout'
         - '"installed" not in winget_install.stdout'
 
+      ignore_errors: yes 
       retries: 3
       delay: 10
       until: winget_install is not failed
